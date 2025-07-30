@@ -1,1 +1,0 @@
-document.getElementById('admin-content').innerText='這是管理頁，尚待實作';
