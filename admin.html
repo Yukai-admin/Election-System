@@ -101,6 +101,23 @@
     <button class="btn-save" id="saveAnnouncement">💾 儲存公告</button>
   </section>
 
+  <!-- 新增的公告發送區 -->
+  <section class="setting" style="margin-top: 2em;">
+    <h2>📢 手動發送當選公告到 Discord</h2>
+    <textarea
+      id="announcementInput"
+      rows="12"
+      style="width: 100%; font-size: 1.1em; padding: 1em; border-radius: 10px; resize: vertical;"
+      placeholder="請輸入完整公告內容，例如：&#10;&#10;📢 **中央選舉委員會公告：當選人名單公布** 🎉&#10;..."></textarea>
+    <br /><br />
+    <button
+      onclick="sendCustomAnnouncement()"
+      style="font-size: 1.2em; background-color: #5865f2; color: white; padding: 0.7em 2em; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2);"
+    >
+      📤 發送公告
+    </button>
+  </section>
+
   <section class="setting">
     <h2>⏰ 投票截止時間設定</h2>
     <input type="datetime-local" id="voteDeadline" />
@@ -156,7 +173,7 @@
         .then(res => res.json())
         .then(user => {
           discordUser = user;
-          // 這裡示範簡單管理員判斷 (可用實際 Discord ID 判斷)
+          // 這裡示範簡單管理員判斷 (請改成你的 Discord ID)
           const adminIDs = ["你的DiscordID1", "你的DiscordID2"]; // <- 請改成你的 Discord ID
           if (!adminIDs.includes(user.id)) {
             statusEl.textContent = "❌ 您不是管理員，無法使用此頁面";
@@ -286,6 +303,42 @@
 
         pendingListEl.appendChild(div);
       }
+    }
+
+
+    // ===== 新增：手動發送公告到 Discord Webhook =====
+    const webhookUrl = "https://discordapp.com/api/webhooks/1400084225293811782/3ExJi4ugt4gRdsSJgvLrxfRnYdSy7NoHI7EGfJUqzqkhby7o-1MnrZM3hsygOutU0LEg";
+
+    function sendCustomAnnouncement() {
+      const textarea = document.getElementById("announcementInput");
+      const content = textarea.value.trim();
+
+      if (!content) {
+        alert("⚠️ 請輸入公告內容再發送！");
+        return;
+      }
+
+      if (!confirm("你確定要發送這段公告到 Discord 嗎？")) return;
+
+      fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content,
+          username: "選務系統",
+          avatar_url: "https://cdn-icons-png.flaticon.com/512/942/942748.png"
+        })
+      }).then(res => {
+        if (res.ok) {
+          alert("✅ 已成功發送公告至 Discord！");
+          textarea.value = "";
+        } else {
+          alert("❌ 發送失敗，請確認 webhook 是否有效！");
+        }
+      }).catch(err => {
+        console.error("Webhook 發送錯誤：", err);
+        alert("❌ 發送失敗，請查看 Console 錯誤訊息");
+      });
     }
   </script>
 </body>
