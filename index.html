@@ -3,67 +3,83 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>📢 選務系統首頁</title>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+  <title>📢 選舉系統首頁</title>
   <style>
     body {
-      background: linear-gradient(135deg, #7289da, #99aab5);
       font-family: "Segoe UI", "Noto Sans TC", sans-serif;
-      margin: 0;
-      padding: 2em;
-      color: white;
+      background: #f0f4ff;
+      padding: 2em 1em;
+      max-width: 720px;
+      margin: auto;
+      color: #222;
+    }
+    h1, h2 {
       text-align: center;
     }
-    h1 {
-      font-size: 3em;
-      margin-bottom: 0.2em;
-    }
-    .announcement, .countdown {
-      background-color: rgba(0, 0, 0, 0.2);
-      margin: 1em auto;
+    .card {
+      background: white;
       padding: 1.5em;
-      border-radius: 12px;
-      max-width: 600px;
+      border-radius: 14px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+      margin-bottom: 2em;
     }
-    .announcement h2, .countdown h2 {
-      margin-bottom: 0.5em;
-      font-size: 1.5em;
+    #announcement, #deadline {
+      font-size: 1.1em;
+      line-height: 1.6;
+      white-space: pre-wrap;
     }
-    button {
-      font-size: 1.5em;
+    .btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      padding: 0.9em;
+      font-size: 1.1em;
+      border: none;
+      border-radius: 10px;
       background-color: #5865f2;
       color: white;
-      padding: 0.8em 2em;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      box-shadow: 0 5px 15px rgba(88,101,242,0.6);
+      text-decoration: none;
       margin-top: 2em;
       transition: background-color 0.3s;
     }
-    button:hover {
+    .btn:hover {
       background-color: #4752c4;
+    }
+    footer {
+      text-align: center;
+      color: #666;
+      margin-top: 3em;
+      font-size: 0.9em;
     }
   </style>
 </head>
 <body>
-  <h1>🗳️ 歡迎來到選務系統</h1>
+  <h1>📢 中央選舉委員會</h1>
 
-  <div class="announcement">
-    <h2>📣 最新公告</h2>
-    <p id="announcementText">載入中...</p>
+  <div class="card">
+    <h2>📰 最新公告</h2>
+    <div id="announcement">🔄 載入中...</div>
   </div>
 
-  <div class="countdown">
-    <h2>⏰ 距離投票截止還有</h2>
-    <p id="countdownText">--:--:--</p>
+  <div class="card">
+    <h2>⏰ 投票截止時間</h2>
+    <div id="deadline">🔄 載入中...</div>
   </div>
 
-  <button onclick="window.location.href='login.html'">🔐 使用 Discord 登入</button>
+  <!-- ⬇️ 你可以在此加上排行榜區塊 -->
+  <!-- <div class="card">
+    <h2>🎖️ 積分排行榜</h2>
+    <div id="leaderboard">（待擴充）</div>
+  </div> -->
 
-  <script>
-    // 初始化 Firebase
+  <a class="btn" href="entry.html">🚪 前往登入選單</a>
+
+  <footer>中央選舉委員會 © 2025</footer>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
     const firebaseConfig = {
       apiKey: "AIzaSyDIkIruhzBiNn_rLTt7D6-2vsLw8r44P48",
       authDomain: "election-system-136e4.firebaseapp.com",
@@ -74,44 +90,32 @@
       appId: "1:956688105056:web:ed7791b53b3fd1168dcd05"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-    // 讀取公告
-    const announcementText = document.getElementById("announcementText");
-    db.ref("settings/announcement").on("value", (snapshot) => {
-      announcementText.textContent = snapshot.val() || "目前尚無公告";
-    });
+    const announcementEl = document.getElementById("announcement");
+    const deadlineEl = document.getElementById("deadline");
 
-    // 倒數計時
-    const countdownText = document.getElementById("countdownText");
-
-    function updateCountdown(deadline) {
-      const now = new Date();
-      const distance = deadline - now;
-
-      if (distance <= 0) {
-        countdownText.textContent = "投票已結束";
-        return;
-      }
-
-      const hours = String(Math.floor(distance / (1000 * 60 * 60))).padStart(2, "0");
-      const minutes = String(Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, "0");
-      const seconds = String(Math.floor((distance % (1000 * 60)) / 1000)).padStart(2, "0");
-
-      countdownText.textContent = `${hours}:${minutes}:${seconds}`;
+    // 載入公告
+    async function loadAnnouncement() {
+      const snap = await get(ref(db, "settings/announcement"));
+      announcementEl.textContent = snap.exists() ? snap.val() : "尚無公告";
     }
 
-    db.ref("settings/voteDeadline").on("value", (snapshot) => {
-      const timestamp = snapshot.val();
-      if (timestamp) {
-        const deadline = new Date(timestamp);
-        updateCountdown(deadline);
-        setInterval(() => updateCountdown(deadline), 1000);
+    // 載入截止時間
+    async function loadDeadline() {
+      const snap = await get(ref(db, "settings/voteDeadline"));
+      if (snap.exists()) {
+        const timestamp = snap.val();
+        const date = new Date(timestamp);
+        deadlineEl.textContent = `${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
       } else {
-        countdownText.textContent = "尚未設定截止時間";
+        deadlineEl.textContent = "尚未設定";
       }
-    });
+    }
+
+    loadAnnouncement();
+    loadDeadline();
   </script>
 </body>
 </html>
