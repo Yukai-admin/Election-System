@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>市民代表選舉系統</title>
+  <style>
+    body {
+      font-family: "Segoe UI", "Noto Sans TC", sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      padding: 1em;
+      text-align: center;
+    }
+    h1 {
+      font-size: 2em;
+      margin-bottom: 0.5em;
+    }
+    #welcome {
+      margin-top: 1em;
+      font-size: 1.2em;
+      color: #333;
+    }
+    #menu {
+      margin-top: 2em;
+      display: none;
+    }
+    .btn {
+      display: block;
+      width: 250px;
+      padding: 0.8em;
+      margin: 1em auto;
+      font-size: 1.1em;
+      background-color: #5865f2;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .btn:hover {
+      background-color: #4752c4;
+    }
+  </style>
+</head>
+<body>
+  <h1>🏛️ 市民代表選舉系統</h1>
+  <div id="welcome">🔄 正在檢查 Discord 登入狀態...</div>
+  <div id="menu">
+    <button class="btn" onclick="goVote()">🗳️ 參與投票</button>
+    <button class="btn" onclick="goApply()">📋 申請候選人</button>
+    <button class="btn" onclick="goAdmin()">🛠️ 管理員後台</button>
+  </div>
+
+  <script type="module">
+    const CLIENT_ID = "1399942836383781025";
+    const REDIRECT_URI = window.location.origin + "/Election-System/index.html";
+    const SCOPE = "identify";
+    const ADMIN_PASSWORD = "123456"; // ✅ 請自行更改此密碼
+
+    const hash = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hash.get("access_token");
+
+    const welcomeEl = document.getElementById("welcome");
+    const menuEl = document.getElementById("menu");
+
+    if (!accessToken) {
+      redirectToLogin();
+    } else {
+      fetch("https://discord.com/api/users/@me", {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      })
+        .then(res => res.json())
+        .then(user => {
+          welcomeEl.innerHTML = `👋 歡迎 <b>${user.username}</b>！<br>請選擇您要進行的操作：`;
+          menuEl.style.display = "block";
+        })
+        .catch(() => {
+          welcomeEl.textContent = "❌ Discord 登入失敗，請重新登入中...";
+          redirectToLogin();
+        });
+    }
+
+    function redirectToLogin() {
+      const loginUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=${SCOPE}`;
+      window.location.href = loginUrl;
+    }
+
+    function goVote() {
+      window.location.href = "vote.html" + window.location.hash;
+    }
+
+    function goApply() {
+      window.location.href = "apply.html" + window.location.hash;
+    }
+
+    function goAdmin() {
+      const pw = prompt("🔐 請輸入管理員密碼");
+      if (pw === ADMIN_PASSWORD) {
+        window.location.href = "admin.html" + window.location.hash;
+      } else if (pw !== null) {
+        alert("❌ 密碼錯誤，無法進入管理後台");
+      }
+    }
+  </script>
+</body>
+</html>
