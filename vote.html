@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>🗳️ 投票頁面</title>
+  <style>
+    body {
+      font-family: "Segoe UI", "Noto Sans TC", sans-serif;
+      background: #f4f6fa;
+      margin: 0;
+      padding: 2em 1em;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 2em;
+      margin-bottom: 1em;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+    }
+
+    .candidate {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      padding: 1.2em;
+      margin-bottom: 1.5em;
+      display: flex;
+      gap: 1em;
+      align-items: flex-start;
+    }
+
+    .candidate img {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .candidate-info {
+      flex: 1;
+    }
+
+    .candidate-info h3 {
+      margin: 0 0 0.3em;
+    }
+
+    .candidate-info p {
+      margin: 0.2em 0;
+    }
+
+    .vote-btn {
+      margin-top: 1em;
+      padding: 0.6em 1.2em;
+      font-size: 1em;
+      background-color: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .vote-btn[disabled] {
+      background-color: #aaa;
+      cursor: not-allowed;
+    }
+
+    #status {
+      margin-bottom: 1em;
+      color: #d32f2f;
+      font-weight: bold;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>🗳️ 選出你支持的候選人</h1>
+  <div id="status">🔄 正在載入候選人與驗證身分...</div>
+  <div class="container" id="candidate-list"></div>
+
+  <script type="module">
+    // Firebase 套件
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, get, set, child, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDIkIruhzBiNn_rLTt7D6-2vsLw8r44P48",
+      authDomain: "election-system-136e4.firebaseapp.com",
+      databaseURL: "https://election-system-136e4-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "election-system-136e4",
+      storageBucket: "election-system-136e4.firebasestorage.app",
+      messagingSenderId: "956688105056",
+      appId: "1:956688105056:web:ed7791b53b3fd1168dcd05"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const statusEl = document.getElementById("status");
+    const listEl = document.getElementById("candidate-list");
+
+    let discordUser = null;
+    let hasVoted = false;
+    let deadlinePassed = false;
+
+    // 解析 access token
+    const hash = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hash.get("access_token");
+
+    if (!accessToken) {
+      statusEl.textContent = "❌ 未登入 Discord，請先回首頁登入";
+    } else {
+      // 呼叫 Discord API 取得使用者資料
+      fetch("https://discord.com/api/users/@me", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+        .then(res => res.json())
+        .then(async user => {
+          discordUser = user;
+          const uid = user.id;
+
+          // 檢查投票截止時間
+          const deadlineSnap = await get(ref(db, "settings/voteDeadline"));
+          const deadline = deadlineSnap.exists() ? deadlineSnap.val() : 0;
+          if (Date.now() > deadline) {
+            statusEl.textContent = "⏰ 投票已截止，無法再投票。";
+            deadlinePassed = true;
+          }
+
+          // 檢查是否已投票
+          const userSnap = await get(ref(db, `users/${uid}`));
+          if (userSnap.exists() && userSnap.val().hasVoted) {
+            hasVoted = true;
+            statusEl.textContent = "✅ 你已投票給：" + userSnap.val().votedFor;
+          } else if (!deadlinePassed) {
+            statusEl.textContent = "✅ 身分驗證成功，請選擇你支持的候選人：";
+          }
+
+          // 顯示候選人列表
+          const candSnap = await get(ref(db, "candidates"));
+          if (candSnap.exists()) {
+            const data = candSnap.val();
+            Object.entries(data).forEach(([id, info]) => {
+              if (!info.approved) return;
+
+              const div = document.createElement("div");
+              div.className = "candidate";
+              div.innerHTML = `
+                <img src="${info.avatarURL || 'https://cdn-icons-png.flaticon.com/512/147/147142.png'}" alt="頭像">
+                <div class="candidate-info">
+                  <h3>👤 ${info.name}</h3>
+                  <p>📣 ${info.statement || "（未填寫政見）"}</p>
+                  <button class="vote-btn" ${hasVoted || deadlinePassed ? "disabled" : ""}>🗳️ 投這位</button>
+                </div>
+              `;
+              const btn = div.querySelector("button");
+              btn.addEventListener("click", async () => {
+                if (confirm(`確定要投給 ${info.name} 嗎？（只能投一次）`)) {
+                  await update(ref(db, `users/${uid}`), {
+                    hasVoted: true,
+                    votedFor: info.name
+                  });
+                  statusEl.textContent = `🎉 已成功投票給：${info.name}`;
+                  document.querySelectorAll(".vote-btn").forEach(b => b.disabled = true);
+                }
+              });
+              listEl.appendChild(div);
+            });
+          } else {
+            statusEl.textContent = "❗ 找不到候選人名單";
+          }
+        })
+        .catch(() => {
+          statusEl.textContent = "❌ Discord 登入失敗，請重新登入";
+        });
+    }
+  </script>
+</body>
+</html>

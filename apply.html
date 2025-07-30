@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>📋 申請成為候選人</title>
+  <style>
+    body {
+      font-family: "Segoe UI", "Noto Sans TC", sans-serif;
+      background: #f0f4ff;
+      margin: 0;
+      padding: 2em 1em;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      background: white;
+      padding: 2em;
+      border-radius: 14px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 480px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 1em;
+    }
+    label {
+      display: block;
+      margin-top: 1em;
+      font-weight: 600;
+    }
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 0.6em;
+      margin-top: 0.3em;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 1em;
+      resize: vertical;
+    }
+    textarea {
+      min-height: 100px;
+    }
+    button {
+      margin-top: 1.5em;
+      width: 100%;
+      padding: 0.9em;
+      font-size: 1.1em;
+      background-color: #5865f2;
+      border: none;
+      color: white;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #4752c4;
+    }
+    #status {
+      margin-top: 1em;
+      font-weight: bold;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📋 申請成為候選人</h1>
+
+    <form id="applyForm">
+      <label for="name">👤 姓名（必填）</label>
+      <input type="text" id="name" name="name" required placeholder="請輸入姓名" />
+
+      <label for="statement">📣 政見（必填）</label>
+      <textarea id="statement" name="statement" required placeholder="請簡述您的政見"></textarea>
+
+      <label for="avatarURL">🖼️ 頭像圖片網址（選填）</label>
+      <input type="text" id="avatarURL" name="avatarURL" placeholder="可貼上頭像圖片連結" />
+
+      <button type="submit">🚀 送出申請</button>
+    </form>
+
+    <div id="status">🔄 正在等待 Discord 登入認證...</div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, set, push } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDIkIruhzBiNn_rLTt7D6-2vsLw8r44P48",
+      authDomain: "election-system-136e4.firebaseapp.com",
+      databaseURL: "https://election-system-136e4-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "election-system-136e4",
+      storageBucket: "election-system-136e4.firebasestorage.app",
+      messagingSenderId: "956688105056",
+      appId: "1:956688105056:web:ed7791b53b3fd1168dcd05"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // 解析 Discord access_token
+    const hash = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hash.get("access_token");
+
+    const statusEl = document.getElementById("status");
+    const form = document.getElementById("applyForm");
+
+    if (!accessToken) {
+      statusEl.textContent = "❌ 尚未登入 Discord，請先回首頁登入";
+      form.style.display = "none";
+    } else {
+      // 取得 Discord 用戶資料
+      fetch("https://discord.com/api/users/@me", {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      })
+        .then(res => res.json())
+        .then(user => {
+          statusEl.textContent = `✅ 歡迎 ${user.username}，請填寫申請表`;
+          form.style.display = "block";
+
+          // 表單送出事件
+          form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            statusEl.textContent = "⏳ 申請中，請稍候...";
+
+            const name = form.name.value.trim();
+            const statement = form.statement.value.trim();
+            const avatarURL = form.avatarURL.value.trim();
+
+            if (!name || !statement) {
+              statusEl.textContent = "❗ 請填寫所有必填欄位";
+              return;
+            }
+
+            // 推送資料到 /applications_pending
+            const appRef = ref(db, "applications_pending");
+            const newAppRef = push(appRef);
+
+            try {
+              await set(newAppRef, {
+                name,
+                statement,
+                avatarURL: avatarURL || "",
+                submittedBy: user.id,
+                createdAt: Date.now()
+              });
+              statusEl.textContent = "🎉 申請送出成功，等待管理員審核！";
+              form.reset();
+            } catch (error) {
+              statusEl.textContent = "❌ 申請失敗，請稍後再試";
+            }
+          });
+        })
+        .catch(() => {
+          statusEl.textContent = "❌ Discord 認證失敗，請重新登入";
+          form.style.display = "none";
+        });
+    }
+  </script>
+</body>
+</html>

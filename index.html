@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>📢 選務系統首頁</title>
+  <style>
+    body {
+      font-family: "Segoe UI", "Noto Sans TC", sans-serif;
+      background: linear-gradient(135deg, #f0f4ff, #fdfdfe);
+      color: #333;
+      padding: 2em 1em;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+      max-width: 500px;
+      width: 100%;
+      padding: 2em;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 2em;
+      margin-bottom: 0.5em;
+    }
+
+    .announcement {
+      background-color: #fff8e1;
+      border-left: 6px solid #ffca28;
+      padding: 1em;
+      border-radius: 8px;
+      margin: 1em 0;
+      font-size: 1.1em;
+    }
+
+    .section {
+      margin: 1.5em 0;
+      text-align: center;
+    }
+
+    .btn {
+      display: inline-block;
+      margin: 0.5em 0.3em;
+      padding: 0.9em 1.4em;
+      font-size: 1em;
+      background-color: #5865f2;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background-color: #4752c4;
+    }
+
+    #countdown {
+      font-weight: bold;
+      color: #d32f2f;
+      font-size: 1.2em;
+    }
+
+    footer {
+      margin-top: 2em;
+      font-size: 0.9em;
+      color: #999;
+      text-align: center;
+    }
+
+    @media screen and (max-width: 500px) {
+      .btn {
+        width: 90%;
+        font-size: 1em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🗳️ 選務系統</h1>
+
+    <div class="announcement" id="announcement">
+      🔄 正在載入公告中...
+    </div>
+
+    <div class="section">
+      ⏰ <strong>投票截止倒數：</strong><br />
+      <span id="countdown">--:--:--</span>
+    </div>
+
+    <div class="section">
+      <button class="btn" onclick="login()">🔐 使用 Discord 登入</button>
+    </div>
+
+    <div class="section">
+      <a href="apply.html" class="btn">📋 我要申請成為候選人</a>
+      <a href="vote.html" class="btn">🧑‍⚖️ 查看候選人與投票</a>
+    </div>
+  </div>
+
+  <footer>
+    🌐 本系統由社群自治運作 | Powered by Firebase + Discord
+  </footer>
+
+  <script type="module">
+    const CLIENT_ID = "1399942836383781025";
+    const REDIRECT_URI = window.location.origin + "/Election-System/vote.html";
+    const SCOPE = "identify";
+
+    function login() {
+      const url = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=${SCOPE}`;
+      window.location.href = url;
+    }
+
+    function updateCountdown(deadline) {
+      const countdownEl = document.getElementById("countdown");
+      setInterval(() => {
+        const now = Date.now();
+        const diff = deadline - now;
+        if (diff <= 0) {
+          countdownEl.textContent = "已截止";
+          return;
+        }
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        countdownEl.textContent = `${h} 小時 ${m} 分 ${s} 秒`;
+      }, 1000);
+    }
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDIkIruhzBiNn_rLTt7D6-2vsLw8r44P48",
+      authDomain: "election-system-136e4.firebaseapp.com",
+      databaseURL: "https://election-system-136e4-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "election-system-136e4",
+      storageBucket: "election-system-136e4.firebasestorage.app",
+      messagingSenderId: "956688105056",
+      appId: "1:956688105056:web:ed7791b53b3fd1168dcd05"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    get(ref(db, "settings/announcement")).then(snapshot => {
+      const announcement = snapshot.exists() ? snapshot.val() : "📭 尚無公告";
+      document.getElementById("announcement").textContent = "📢 " + announcement;
+    });
+
+    get(ref(db, "settings/voteDeadline")).then(snapshot => {
+      if (snapshot.exists()) {
+        updateCountdown(snapshot.val());
+      }
+    });
+  </script>
+</body>
+</html>

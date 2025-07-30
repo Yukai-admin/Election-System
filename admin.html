@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>🛠️ 管理後台</title>
+  <style>
+    body {
+      font-family: "Segoe UI", "Noto Sans TC", sans-serif;
+      background: #f9fafb;
+      padding: 2em 1em;
+      max-width: 800px;
+      margin: auto;
+      color: #222;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    button {
+      cursor: pointer;
+      border: none;
+      padding: 0.5em 1em;
+      border-radius: 6px;
+      font-size: 1em;
+      margin: 0 0.3em;
+      transition: background-color 0.3s;
+    }
+    .btn-approve {
+      background-color: #4caf50;
+      color: white;
+    }
+    .btn-approve:hover {
+      background-color: #388e3c;
+    }
+    .btn-reject {
+      background-color: #f44336;
+      color: white;
+    }
+    .btn-reject:hover {
+      background-color: #d32f2f;
+    }
+    .btn-save {
+      background-color: #1976d2;
+      color: white;
+      margin-top: 0.5em;
+      display: inline-block;
+    }
+    .btn-save:hover {
+      background-color: #115293;
+    }
+    .candidate, .setting {
+      background: white;
+      padding: 1em;
+      border-radius: 12px;
+      margin-bottom: 1em;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+    }
+    .candidate img {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      object-fit: cover;
+      vertical-align: middle;
+      margin-right: 1em;
+    }
+    .candidate-info {
+      display: inline-block;
+      vertical-align: middle;
+      max-width: 600px;
+    }
+    label {
+      font-weight: 600;
+      display: block;
+      margin-top: 1em;
+    }
+    input[type="text"], textarea, input[type="datetime-local"] {
+      width: 100%;
+      padding: 0.6em;
+      margin-top: 0.3em;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 1em;
+      resize: vertical;
+    }
+    #status {
+      text-align: center;
+      margin-bottom: 1em;
+      font-weight: bold;
+      color: #1976d2;
+    }
+  </style>
+</head>
+<body>
+  <h1>🛠️ 管理後台</h1>
+
+  <div id="status">🔄 請先登入 Discord 管理員身分</div>
+
+  <section class="setting">
+    <h2>📢 公告管理</h2>
+    <textarea id="announcement" rows="3" placeholder="請輸入公告內容..."></textarea>
+    <button class="btn-save" id="saveAnnouncement">💾 儲存公告</button>
+  </section>
+
+  <section class="setting">
+    <h2>⏰ 投票截止時間設定</h2>
+    <input type="datetime-local" id="voteDeadline" />
+    <button class="btn-save" id="saveDeadline">💾 儲存截止時間</button>
+  </section>
+
+  <section>
+    <h2>📋 待審核候選人申請</h2>
+    <div id="pendingList">🔄 載入中...</div>
+  </section>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, get, set, remove, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDIkIruhzBiNn_rLTt7D6-2vsLw8r44P48",
+      authDomain: "election-system-136e4.firebaseapp.com",
+      databaseURL: "https://election-system-136e4-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "election-system-136e4",
+      storageBucket: "election-system-136e4.firebasestorage.app",
+      messagingSenderId: "956688105056",
+      appId: "1:956688105056:web:ed7791b53b3fd1168dcd05"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const statusEl = document.getElementById("status");
+    const pendingListEl = document.getElementById("pendingList");
+    const announcementEl = document.getElementById("announcement");
+    const saveAnnouncementBtn = document.getElementById("saveAnnouncement");
+    const voteDeadlineEl = document.getElementById("voteDeadline");
+    const saveDeadlineBtn = document.getElementById("saveDeadline");
+
+    let discordUser = null;
+    const CLIENT_ID = "1399942836383781025";
+    const REDIRECT_URI = window.location.origin + "/Election-System/admin.html";
+    const SCOPE = "identify";
+
+    // Discord OAuth Token 解析
+    const hash = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hash.get("access_token");
+
+    if (!accessToken) {
+      statusEl.textContent = "❌ 尚未登入 Discord，請先登入管理員身分";
+      redirectToLogin();
+    } else {
+      // 取得 Discord 使用者資料
+      fetch("https://discord.com/api/users/@me", {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      })
+        .then(res => res.json())
+        .then(user => {
+          discordUser = user;
+          // 這裡示範簡單管理員判斷 (可用實際 Discord ID 判斷)
+          const adminIDs = ["你的DiscordID1", "你的DiscordID2"]; // <- 請改成你的 Discord ID
+          if (!adminIDs.includes(user.id)) {
+            statusEl.textContent = "❌ 您不是管理員，無法使用此頁面";
+            return;
+          }
+          statusEl.textContent = `✅ 歡迎管理員 ${user.username}`;
+          initAdminPanel();
+        })
+        .catch(() => {
+          statusEl.textContent = "❌ Discord 認證失敗，請重新登入";
+          redirectToLogin();
+        });
+    }
+
+    function redirectToLogin() {
+      const loginUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=${SCOPE}`;
+      setTimeout(() => window.location.href = loginUrl, 3000);
+    }
+
+    // 初始化管理頁面功能
+    async function initAdminPanel() {
+      await loadAnnouncement();
+      await loadVoteDeadline();
+      await loadPendingApplications();
+
+      saveAnnouncementBtn.addEventListener("click", saveAnnouncement);
+      saveDeadlineBtn.addEventListener("click", saveDeadline);
+    }
+
+    // 載入公告
+    async function loadAnnouncement() {
+      const snap = await get(ref(db, "settings/announcement"));
+      announcementEl.value = snap.exists() ? snap.val() : "";
+    }
+
+    // 儲存公告
+    async function saveAnnouncement() {
+      try {
+        await set(ref(db, "settings/announcement"), announcementEl.value.trim());
+        alert("公告已儲存！");
+      } catch {
+        alert("公告儲存失敗，請稍後再試");
+      }
+    }
+
+    // 載入投票截止時間
+    async function loadVoteDeadline() {
+      const snap = await get(ref(db, "settings/voteDeadline"));
+      if (snap.exists()) {
+        const timestamp = snap.val();
+        const date = new Date(timestamp);
+        voteDeadlineEl.value = date.toISOString().slice(0,16); // yyyy-MM-ddTHH:mm
+      }
+    }
+
+    // 儲存截止時間
+    async function saveDeadline() {
+      if (!voteDeadlineEl.value) {
+        alert("請選擇有效的截止時間");
+        return;
+      }
+      const timestamp = new Date(voteDeadlineEl.value).getTime();
+      try {
+        await set(ref(db, "settings/voteDeadline"), timestamp);
+        alert("截止時間已儲存！");
+      } catch {
+        alert("截止時間儲存失敗，請稍後再試");
+      }
+    }
+
+    // 載入待審核申請
+    async function loadPendingApplications() {
+      const snap = await get(ref(db, "applications_pending"));
+      pendingListEl.innerHTML = "";
+      if (!snap.exists()) {
+        pendingListEl.textContent = "目前無待審核申請";
+        return;
+      }
+
+      const apps = snap.val();
+      for (const [key, app] of Object.entries(apps)) {
+        const div = document.createElement("div");
+        div.className = "candidate";
+
+        div.innerHTML = `
+          <img src="${app.avatarURL || 'https://cdn-icons-png.flaticon.com/512/147/147142.png'}" alt="頭像" />
+          <div class="candidate-info">
+            <h3>${app.name}</h3>
+            <p>📣 ${app.statement}</p>
+            <p>🔑 申請者 ID: ${app.submittedBy}</p>
+            <div style="margin-top: 0.8em;">
+              <button class="btn-approve">✅ 通過</button>
+              <button class="btn-reject">❌ 拒絕</button>
+            </div>
+          </div>
+        `;
+
+        const btnApprove = div.querySelector(".btn-approve");
+        const btnReject = div.querySelector(".btn-reject");
+
+        btnApprove.onclick = async () => {
+          try {
+            // 審核通過：加入 candidates，刪除申請
+            await update(ref(db, `candidates/${key}`), {
+              ...app,
+              approved: true
+            });
+            await remove(ref(db, `applications_pending/${key}`));
+            alert(`✅ 通過 ${app.name}`);
+            div.remove();
+          } catch {
+            alert("通過操作失敗");
+          }
+        };
+
+        btnReject.onclick = async () => {
+          if (confirm(`確定拒絕 ${app.name} 的申請？`)) {
+            try {
+              await remove(ref(db, `applications_pending/${key}`));
+              alert(`❌ 已拒絕 ${app.name}`);
+              div.remove();
+            } catch {
+              alert("拒絕操作失敗");
+            }
+          }
+        };
+
+        pendingListEl.appendChild(div);
+      }
+    }
+  </script>
+</body>
+</html>
