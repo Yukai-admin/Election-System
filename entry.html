@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>市民代表選舉系統</title>
+  <title>代表選舉系統</title>
   <style>
     body {
       font-family: "Segoe UI", "Noto Sans TC", sans-serif;
@@ -50,7 +50,7 @@
   </style>
 </head>
 <body>
-  <h1>🏛️ 市民代表選舉系統</h1>
+  <h1>🏛️ 選舉系統</h1>
   <div id="welcome">🔄 正在檢查 Discord 登入狀態...</div>
   <div id="menu">
     <button class="btn" onclick="goVote()">🗳️ 參與投票</button>
@@ -62,7 +62,7 @@
     const CLIENT_ID = "1399942836383781025";
     const REDIRECT_URI = window.location.origin + "/Election-System/index.html";
     const SCOPE = "identify";
-    const ADMIN_PASSWORD = "123456"; // ✅ 請自行更改此密碼
+    const ADMIN_PASSWORD = "Y20241019"; // ✅ 請自行更改此密碼
 
     const hash = new URLSearchParams(window.location.hash.substring(1));
     const accessToken = hash.get("access_token");
